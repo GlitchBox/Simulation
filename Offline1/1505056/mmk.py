@@ -118,7 +118,7 @@ class StartEvent(Event):
         # this is the startEvent. It will enqueue an arrival event
         firstArrivalTime = self.eventTime + sim.expon(1/sim.params.lambd)
         sim.scheduleEvent(ArrivalEvent(firstArrivalTime, sim))
-        sim.scheduleEvent(ExitEvent(50000, sim))
+        sim.scheduleEvent(ExitEvent(10000, sim))
         
         
 
@@ -225,7 +225,7 @@ class Simulator:
 
         while len(self.eventQ) > 0:
             time, event = heapq.heappop(self.eventQ)
-            print(event.eventTime, 'Event', event)
+            #print(event.eventTime, 'Event', event)
 
             if event.eventType == 'EXIT':
                 break
@@ -267,7 +267,9 @@ def experiment2():
     avgdelay = []
     util = []
 
+    i=1
     for ro in ratios:
+        print(f"iteration {i}")
         sim = Simulator(seed)
         sim.configure(Params(mu * ro, mu, 1), States())
         sim.run()
@@ -276,6 +278,7 @@ def experiment2():
         avglength.append(length)
         avgdelay.append(delay)
         util.append(utl)
+        i+=1
 
     plt.figure(1)
     plt.subplot(311)
@@ -304,8 +307,10 @@ def experiment3():
 
 
 def main():
+    print("Experiment 1")
     experiment1()
-    # experiment2()
+    print("\n\nExperiment 2")
+    experiment2()
     # experiment3()
 
 
