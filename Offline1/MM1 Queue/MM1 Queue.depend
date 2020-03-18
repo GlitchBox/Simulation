@@ -1,0 +1,23 @@
+# depslib dependency file v1.0
+1583005378 source:g:\buet\january 2020\cse 412 simulation lab\mm1 queue\lcgrand.c
+
+1583005402 source:g:\buet\january 2020\cse 412 simulation lab\mm1 queue\main.c
+	<stdio.h>
+	<math.h>
+	<stdlib.h>
+	"lcgrand.h"
+
+1583005336 "
+
+1583005336 g:\buet\january 2020\cse 412 simulation lab\mm1 queue\lcgrand.h
+	"lcgrand.h"
+
+1584442829 source:/media/navid/Life1/Academic Hazard/4-2/Simulation Sessional/Offline1/MM1 Queue/main.c
+	<stdio.h>
+	<math.h>
+	<stdlib.h>
+	"lcgrand.h"
+
+1584445565 /media/navid/Life1/Academic Hazard/4-2/Simulation Sessional/Offline1/MM1 Queue/lcgrand.h
+	"lcgrand.h"
+
