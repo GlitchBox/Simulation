@@ -324,47 +324,43 @@ def experiment3():
     # Similar to experiment2 but for different values of k; 1, 2, 3, 4
     # Generate the same plots
     # Fix lambd = (5.0/60), mu = (8.0/60) and change value of k
+
     seed = 110
-    sim = Simulator(seed)
-    sim.configure(Params(5.0/60, 8.0/60, 1), States())
-    sim.run()
-    sim.printResults()
+    avglength = []
+    avgdelay = []
+    util = []
+    ks = [1,2,3,4]
 
+    for k in ks:
+        print(f"iteration {k}")
+        sim = Simulator(seed)
+        sim = Simulator(seed)
+        sim.configure(Params(5.0/60, 8.0/60, k), States())
+        sim.run()
+        # sim.printResults()
 
-    # avglength = []
-    # avgdelay = []
-    # util = []
+        length, delay, utl = sim.getResults()
+        avglength.append(length)
+        avgdelay.append(delay)
+        util.append(utl)
 
-    # i=1
-    # for ro in ratios:
-    #     print(f"iteration {i}")
-    #     sim = Simulator(seed)
-    #     sim.configure(Params(mu * ro, mu, 1), States(k=1))
-    #     sim.run()
+    plt.figure(1)
+    plt.subplot(311)
+    plt.plot(ks, avglength)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Avg Q length')
 
-    #     length, delay, utl = sim.getResults()
-    #     avglength.append(length)
-    #     avgdelay.append(delay)
-    #     util.append(utl)
-    #     i+=1
-
-    # plt.figure(1)
-    # plt.subplot(311)
-    # plt.plot(ratios, avglength)
-    # plt.xlabel('Ratio (ro)')
-    # plt.ylabel('Avg Q length')
-
-    # plt.subplot(312)
-    # plt.plot(ratios, avgdelay)
-    # plt.xlabel('Ratio (ro)')
-    # plt.ylabel('Avg Q delay (sec)')
+    plt.subplot(312)
+    plt.plot(ks, avgdelay)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Avg Q delay (sec)')
 
     # plt.subplot(313)
-    # plt.plot(ratios, util)
+    # plt.plot(ks, util)
     # plt.xlabel('Ratio (ro)')
     # plt.ylabel('Util')
 
-    # plt.show()
+    plt.show()
 
 
 def main():
