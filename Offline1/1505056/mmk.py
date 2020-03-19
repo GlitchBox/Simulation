@@ -35,7 +35,7 @@ class States:
     def __init__(self):
         # States
         self.queue = [] #this queue stores the arrival times
-        self.status = IDLE
+        self.status = [] #this holds the status of k servers
         self.numInQ = 0.0
         self.timeLastEvent = 0.0
         
@@ -50,6 +50,7 @@ class States:
         self.avgQlength = 0.0
         self.served = 0 #customers delayed
 
+
     def update(self, sim, event):
         #if the event is the START event
         if event.eventType == 'START':
@@ -62,7 +63,7 @@ class States:
         self.areaNumInQ += (self.numInQ * timeSincelastEvent)
 
         #update area under server-busy indicator function
-        self.areaServerStatus += (self.status * timeSincelastEvent)
+        #self.areaServerStatus += (self.status * timeSincelastEvent)
         
 
     def finish(self, sim):
@@ -71,9 +72,8 @@ class States:
         self.util = self.areaServerStatus/sim.simclock
 
     def printResults(self, sim):
-        self.finish(sim)
 
-        print("Results from experiment.")
+        print("\n\nResults from experiment.")
         # DO NOT CHANGE THESE LINES
         print('MMk Results: lambda = %lf, mu = %lf, k = %d' % (sim.params.lambd, sim.params.mu, sim.params.k))
         print('MMk Total customer served: %d' % (self.served))
@@ -81,18 +81,26 @@ class States:
         print('MMk Average customer delay in queue: %lf' % (self.avgQdelay))
         print('MMk Time-average server utility: %lf' % (self.util))
 
-        print("Analytic Results")
-        #Analytical Results
-        l = sim.params.lambd
-        m = sim.params.mu
-        print(f'Average Queue Length: {(l*l)/(m*(m-l))}')
-        print(f'Average Delay in Queue: {l/(m*(m-l))}')
-        print(f'Average Queue Length: {l/m}')
-
     def getResults(self, sim):
         return (self.avgQlength, self.avgQdelay, self.util)
 
-# Write more functions if required
+    def initStatus(self, k:int):
+        self.status = []
+        i=0
+        while i<k:
+            self.status.append(IDLE)
+            i+=1
+
+    def checkStatus(self, k):
+        i=0
+        while i<k:
+            if self.status[i]==IDLE:
+                return i
+            i+=1
+        return -1
+    
+
+
 
 
 class Event:
@@ -130,8 +138,15 @@ class ExitEvent(Event):
         self.sim = sim
 
     def process(self, sim):
-        # Complete this function
-        None
+        sim.states.finish(sim)
+        
+        print("\n\nAnalytic Results")
+        #Analytical Results
+        l = sim.params.lambd
+        m = sim.params.mu
+        print(f'Average Queue Length: {(l*l)/(m*(m-l))}')
+        print(f'Average Delay in Queue: {l/(m*(m-l))}')
+        print(f'Average Queue Length: {l/m}')
 
 
 class ArrivalEvent(Event):
@@ -147,7 +162,8 @@ class ArrivalEvent(Event):
         sim.scheduleEvent(ArrivalEvent(nextArrival, sim))
 
         #check to see if the server is busy
-        if sim.states.status==BUSY:
+        freeServer = sim.states.checkStatus(self.sim.params.k)
+        if freeServer == -1:
             sim.states.numInQ += 1
             sim.states.queue.append(sim.simclock)
         else:
@@ -156,25 +172,26 @@ class ArrivalEvent(Event):
 
             #increment the number of customers served and make server busy
             sim.states.served += 1
-            sim.states.status = BUSY
+            sim.states.status[freeServer] = BUSY
 
             #create the departure event for this arrival
             departureTime = sim.simclock + sim.expon(1/sim.params.mu)
-            sim.scheduleEvent(DepartureEvent(departureTime, sim))
+            sim.scheduleEvent(DepartureEvent(departureTime, sim, serverNo=freeServer))
 
 
 class DepartureEvent(Event):
     
-    def __init__(self, eventTime, sim):
+    def __init__(self, eventTime, sim, serverNo:int):
         self.eventTime = eventTime
         self.eventType = 'DEPART'
         self.sim = sim
+        self.serverNo = serverNo
 
 
     def process(self, sim):
         #if there is no one in the queue, make the server idle
         if sim.states.numInQ==0:
-            sim.states.status = IDLE
+            sim.states.initStatus(sim.params.k)
         else:
             #queue is nonempty, so let the first person in queue receive service
             sim.states.numInQ -= 1
@@ -187,7 +204,7 @@ class DepartureEvent(Event):
             #increment the number of customers served and schedule departure
             sim.states.served += 1
             departureTime = sim.simclock + sim.expon(1/sim.params.mu)
-            sim.scheduleEvent(DepartureEvent(departureTime, sim))
+            sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
 
             #move everyone in the queue one step up
             sim.states.queue = sim.states.queue[1:]
@@ -206,6 +223,7 @@ class Simulator:
 
     def initialize(self):
         self.simclock = 0
+        self.states.initStatus(self.params.k)
         self.scheduleEvent(StartEvent(0, self))
 
     def configure(self, params, states):
@@ -225,9 +243,11 @@ class Simulator:
 
         while len(self.eventQ) > 0:
             time, event = heapq.heappop(self.eventQ)
-            #print(event.eventTime, 'Event', event)
+            # print(event.eventTime, 'Event', event)
+            # print(self.states.status)
 
             if event.eventType == 'EXIT':
+                event.process(self)
                 break
 
             #states are the performance matrices i.e. avg_q_len, avg_delay etc
@@ -237,6 +257,7 @@ class Simulator:
             # print(event.eventTime, 'Event', event)
             self.simclock = event.eventTime
             event.process(self)
+            # print(self.states.status)
 
         self.states.finish(self)
 
@@ -303,15 +324,56 @@ def experiment3():
     # Similar to experiment2 but for different values of k; 1, 2, 3, 4
     # Generate the same plots
     # Fix lambd = (5.0/60), mu = (8.0/60) and change value of k
-    None
+    seed = 110
+    sim = Simulator(seed)
+    sim.configure(Params(5.0/60, 8.0/60, 1), States())
+    sim.run()
+    sim.printResults()
+
+
+    # avglength = []
+    # avgdelay = []
+    # util = []
+
+    # i=1
+    # for ro in ratios:
+    #     print(f"iteration {i}")
+    #     sim = Simulator(seed)
+    #     sim.configure(Params(mu * ro, mu, 1), States(k=1))
+    #     sim.run()
+
+    #     length, delay, utl = sim.getResults()
+    #     avglength.append(length)
+    #     avgdelay.append(delay)
+    #     util.append(utl)
+    #     i+=1
+
+    # plt.figure(1)
+    # plt.subplot(311)
+    # plt.plot(ratios, avglength)
+    # plt.xlabel('Ratio (ro)')
+    # plt.ylabel('Avg Q length')
+
+    # plt.subplot(312)
+    # plt.plot(ratios, avgdelay)
+    # plt.xlabel('Ratio (ro)')
+    # plt.ylabel('Avg Q delay (sec)')
+
+    # plt.subplot(313)
+    # plt.plot(ratios, util)
+    # plt.xlabel('Ratio (ro)')
+    # plt.ylabel('Util')
+
+    # plt.show()
 
 
 def main():
-    print("Experiment 1")
-    experiment1()
-    print("\n\nExperiment 2")
-    experiment2()
-    # experiment3()
+    # print("Experiment 1")
+    # experiment1()
+    # print("\n\nExperiment 2")
+    # experiment2()
+    print("\n\nExperiment 3")
+    experiment3()
 
 
 if __name__ == "__main__":
