@@ -63,7 +63,11 @@ class States:
         self.areaNumInQ += (self.numInQ * timeSincelastEvent)
 
         #update area under server-busy indicator function
-        #self.areaServerStatus += (self.status * timeSincelastEvent)
+        busyServers = 0
+        for i in range(sim.params.k):
+            if self.status[i]==BUSY:
+                busyServers += 1
+        self.areaServerStatus += ((busyServers/sim.params.k) * timeSincelastEvent)
         
 
     def finish(self, sim):
@@ -72,7 +76,7 @@ class States:
         self.util = self.areaServerStatus/sim.simclock
 
     def printResults(self, sim):
-
+        
         print("\n\nResults from experiment.")
         # DO NOT CHANGE THESE LINES
         print('MMk Results: lambda = %lf, mu = %lf, k = %d' % (sim.params.lambd, sim.params.mu, sim.params.k))
@@ -138,15 +142,7 @@ class ExitEvent(Event):
         self.sim = sim
 
     def process(self, sim):
-        sim.states.finish(sim)
-        
-        print("\n\nAnalytic Results")
-        #Analytical Results
-        l = sim.params.lambd
-        m = sim.params.mu
-        print(f'Average Queue Length: {(l*l)/(m*(m-l))}')
-        print(f'Average Delay in Queue: {l/(m*(m-l))}')
-        print(f'Average Queue Length: {l/m}')
+        None
 
 
 class ArrivalEvent(Event):
@@ -158,7 +154,9 @@ class ArrivalEvent(Event):
 
     def process(self, sim):
         #schedule the next arrival
-        nextArrival = sim.simclock + sim.expon(1/sim.params.lambd)
+        temp= sim.expon(1/sim.params.lambd)
+        # print(temp)
+        nextArrival = sim.simclock + temp
         sim.scheduleEvent(ArrivalEvent(nextArrival, sim))
 
         #check to see if the server is busy
@@ -175,7 +173,9 @@ class ArrivalEvent(Event):
             sim.states.status[freeServer] = BUSY
 
             #create the departure event for this arrival
-            departureTime = sim.simclock + sim.expon(1/sim.params.mu)
+            temp= sim.expon(1/sim.params.mu)
+            # print(temp)
+            departureTime = sim.simclock + temp
             sim.scheduleEvent(DepartureEvent(departureTime, sim, serverNo=freeServer))
 
 
@@ -203,7 +203,9 @@ class DepartureEvent(Event):
 
             #increment the number of customers served and schedule departure
             sim.states.served += 1
-            departureTime = sim.simclock + sim.expon(1/sim.params.mu)
+            temp= sim.expon(1/sim.params.mu)
+            # print(temp)
+            departureTime = sim.simclock + temp
             sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
 
             #move everyone in the queue one step up
@@ -247,7 +249,7 @@ class Simulator:
             # print(self.states.status)
 
             if event.eventType == 'EXIT':
-                event.process(self)
+                # event.process(self)
                 break
 
             #states are the performance matrices i.e. avg_q_len, avg_delay etc
@@ -269,6 +271,7 @@ class Simulator:
 
     def expon(self, mean):
         return (-mean * math.log(lcgrand(1)))
+        # return random.expovariate(1/mean)
 
 
 def experiment1():
@@ -276,11 +279,20 @@ def experiment1():
     sim = Simulator(seed)
     sim.configure(Params(5.0 / 60, 8.0 / 60, 1), States())
     sim.run()
-    sim.printResults()
+    sim.printResults()    
+        
+    print("\n\nAnalytic Results")
+    #Analytical Results
+    l = sim.params.lambd
+    m = sim.params.mu
+    print(f'Average Queue Length: {(l*l)/(m*(m-l))}')
+    print(f'Average Delay in Queue: {l/(m*(m-l))}')
+    print(f'Average Queue Length: {l/m}')
 
 
 def experiment2():
-    seed = 110
+    #seed = 110
+    seed = 101
     mu = 1000.0 / 60
     ratios = [u / 10.0 for u in range(1, 11)]
 
@@ -291,6 +303,7 @@ def experiment2():
     i=1
     for ro in ratios:
         print(f"iteration {i}")
+        zrng[1] = 1973272912
         sim = Simulator(seed)
         sim.configure(Params(mu * ro, mu, 1), States())
         sim.run()
@@ -325,7 +338,8 @@ def experiment3():
     # Generate the same plots
     # Fix lambd = (5.0/60), mu = (8.0/60) and change value of k
 
-    seed = 110
+    #seed = 110
+    seed = 101
     avglength = []
     avgdelay = []
     util = []
@@ -333,11 +347,11 @@ def experiment3():
 
     for k in ks:
         print(f"iteration {k}")
-        sim = Simulator(seed)
+        zrng[1] = 1973272912
         sim = Simulator(seed)
         sim.configure(Params(5.0/60, 8.0/60, k), States())
         sim.run()
-        # sim.printResults()
+        sim.printResults()
 
         length, delay, utl = sim.getResults()
         avglength.append(length)
@@ -355,19 +369,19 @@ def experiment3():
     plt.xlabel('Ratio (ro)')
     plt.ylabel('Avg Q delay (sec)')
 
-    # plt.subplot(313)
-    # plt.plot(ks, util)
-    # plt.xlabel('Ratio (ro)')
-    # plt.ylabel('Util')
+    plt.subplot(313)
+    plt.plot(ks, util)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Util')
 
     plt.show()
 
 
 def main():
-    # print("Experiment 1")
-    # experiment1()
-    # print("\n\nExperiment 2")
-    # experiment2()
+    print("Experiment 1")
+    experiment1()
+    print("\n\nExperiment 2")
+    experiment2()
     print("\n\nExperiment 3")
     experiment3()
 
