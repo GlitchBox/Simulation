@@ -21,10 +21,11 @@ BUSY = 1
 
 # Parameters
 class Params:
-    def __init__(self, lambd, mu, k):
+    def __init__(self, lambd, mu, k, q):
         self.lambd = lambd  # interarrival rate
         self.mu = mu  # service rate
         self.k = k
+        self.queueNo = q
     # Note lambd and mu are not mean value, they are rates i.e. (1/mean)
 
 # Write more functions if required
@@ -174,13 +175,16 @@ class ArrivalEvent(Event):
             #if all the servers are busy, then put the event in the leftmost shortest queue
             shortestQueue = 0
             index = 1
-            while index<sim.params.k:
+            while index<sim.params.queueNo:
                 if len(sim.states.queue[index])<len(sim.states.queue[shortestQueue]):
                     shortestQueue = index
 
                 index+=1
-            
+            # print(shortestQueue)
+            # print(sim.states.queue)
             sim.states.queue[shortestQueue].append(sim.simclock)
+            # print(sim.states.queue)
+            # print("here")
         else:
             delay = 0.0
             sim.states.totalDelay += delay
@@ -207,15 +211,64 @@ class DepartureEvent(Event):
 
     def process(self, sim):
         #if there is no one in the particular queue from which the departure event is being issued, make the server idle
-        if len(sim.states.queue[self.serverNo])==0:
-            sim.states.status[self.serverNo] = IDLE
+        if (len(sim.states.queue)==1 and len(sim.states.queue[0])==0) or (len(sim.states.queue)>1 and len(sim.states.queue[self.serverNo])==0):
+
+            #considerations for the case 1) the server can be at the leftmost position 2) at the rightmost position 3) other positions
+            largerQ = -1
+            maxDiff = -1
+            if len(sim.states.queue)>1:
+                if self.serverNo==0:
+                    largerQ = self.serverNo+1
+                    maxDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
+                elif self.serverNo==(sim.params.k-1):
+                    largerQ = self.serverNo-1
+                    maxDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
+                else:
+                    leftDiff = len(sim.states.queue[self.serverNo-1])- len(sim.states.queue[self.serverNo])
+                    rightDiff = len(sim.states.queue[self.serverNo+1])- len(sim.states.queue[self.serverNo])
+
+                    if rightDiff>leftDiff:
+                        maxDiff = rightDiff
+                        largerQ = self.serverNo + 1
+                    else:
+                        maxDiff = leftDiff
+                        largerQ = self.serverNo - 1
+
+                    if maxDiff>=2:
+                        sim.states.numInQ -= 1
+
+                        #the we get the arrival time of the first person
+                        #in the queue(sim.states.queue) and calculate the delay faced
+                        delay = sim.simclock - sim.states.queue[largerQ][-1]
+                        sim.states.totalDelay += delay
+
+                        #increment the number of customers served and schedule departure
+                        sim.states.served += 1
+                        temp= sim.expon(1/sim.params.mu)
+                        # print(temp)
+                        departureTime = sim.simclock + temp
+                        sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
+
+                        #the last person from the largerQ has left
+                        sim.states.queue[largerQ] = sim.states.queue[largerQ][0:-1]
+                    else:
+                        sim.states.status[self.serverNo] = IDLE
+
+
+            else:
+                sim.states.initStatus(sim.params.k)
+
+
         else:
             #queue of this particular server is nonempty, so let the first person in queue receive service
             sim.states.numInQ -= 1
 
             #the we get the arrival time of the first person
             #in the queue(sim.states.queue) and calculate the delay faced
-            delay = sim.simclock - sim.states.queue[self.serverNo][0]
+            if sim.params.queueNo>1:
+                delay = sim.simclock - sim.states.queue[self.serverNo][0]
+            else:
+                delay = sim.simclock - sim.states.queue[0][0]
             sim.states.totalDelay += delay
 
             #increment the number of customers served and schedule departure
@@ -226,7 +279,38 @@ class DepartureEvent(Event):
             sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
 
             #move everyone in the queue one step up
-            sim.states.queue[self.serverNo] = sim.states.queue[self.serverNo][1:]
+            if sim.params.queueNo>1:
+                sim.states.queue[self.serverNo] = sim.states.queue[self.serverNo][1:]
+            else:
+                sim.states.queue[0] = sim.states.queue[0][1:]
+            #when there are k queues,
+            #I'll check whether any person from the queue on the left or from the queue on the right can join this queue
+            if len(sim.states.queue)>1:
+
+                largerQ = -1
+                maxDiff = -1
+                if self.serverNo==0:
+                    largerQ = self.serverNo + 1
+                    maxDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
+                elif self.serverNo==(sim.params.k-1):
+                    largerQ = self.serverNo - 1
+                    maxDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
+                else:
+                    rightDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
+                    leftDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
+
+                    if rightDiff>leftDiff:
+                        maxDiff = rightDiff
+                        largerQ = self.serverNo + 1
+                    else:
+                        maxDiff = leftDiff
+                        largerQ = self.serverNo - 1
+                #if there is any queue(either on left or right) which has at least two more people, then one people from the end of the queue will join this queue
+                if maxDiff>=2:
+                    sim.states.queue[self.serverNo].append(sim.states.queue[largerQ][-1])
+                    #adjust the queue from which the person left
+                    sim.states.queue[largerQ] = sim.states.queue[largerQ][0:-1]
+
 
 
 
@@ -243,7 +327,8 @@ class Simulator:
     def initialize(self):
         self.simclock = 0
         self.states.initStatus(self.params.k)
-        self.states.initQueue(self.params.k)
+        self.states.initQueue(self.params.queueNo)
+        # print(self.states.queue)
         self.scheduleEvent(StartEvent(0, self))
 
     def configure(self, params, states):
@@ -295,7 +380,7 @@ class Simulator:
 def experiment1():
     seed = 101
     sim = Simulator(seed)
-    sim.configure(Params(5.0 / 60, 8.0 / 60, 2), States())
+    sim.configure(Params(5.0 / 60, 8.0 / 60, 1, 1), States())
     sim.run()
     sim.printResults()    
         
@@ -323,7 +408,7 @@ def experiment2():
         print(f"iteration {i}")
         zrng[1] = 1973272912
         sim = Simulator(seed)
-        sim.configure(Params(mu * ro, mu, 1), States())
+        sim.configure(Params(mu * ro, mu, 1, 1), States())
         sim.run()
 
         length, delay, utl = sim.getResults()
@@ -367,7 +452,7 @@ def experiment3():
         print(f"iteration {k}")
         zrng[1] = 1973272912
         sim = Simulator(seed)
-        sim.configure(Params(5.0/60, 8.0/60, k), States())
+        sim.configure(Params(5.0/60, 8.0/60, k, 1), States())
         sim.run()
         sim.printResults()
 
@@ -398,10 +483,10 @@ def experiment3():
 def main():
     print("Experiment 1")
     experiment1()
-    # print("\n\nExperiment 2")
-    # experiment2()
-    # print("\n\nExperiment 3")
-    # experiment3()
+    print("\n\nExperiment 2")
+    experiment2()
+    print("\n\nExperiment 3")
+    experiment3()
 
 
 if __name__ == "__main__":
