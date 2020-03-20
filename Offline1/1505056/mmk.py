@@ -72,7 +72,7 @@ class States:
 
     def finish(self, sim):
         self.avgQdelay = self.totalDelay/self.served
-        self.avgQlength = self.areaNumInQ/sim.simclock
+        self.avgQlength = (self.areaNumInQ/sim.simclock)/sim.params.k
         self.util = self.areaServerStatus/sim.simclock
 
     def printResults(self, sim):
@@ -102,6 +102,14 @@ class States:
                 return i
             i+=1
         return -1
+
+    def initQueue(self, k:int):
+        self.queue = []
+        i=0
+        while i<k:
+            self.queue.append([])
+
+            i+=1
     
 
 
@@ -163,7 +171,16 @@ class ArrivalEvent(Event):
         freeServer = sim.states.checkStatus(self.sim.params.k)
         if freeServer == -1:
             sim.states.numInQ += 1
-            sim.states.queue.append(sim.simclock)
+            #if all the servers are busy, then put the event in the leftmost shortest queue
+            shortestQueue = 0
+            index = 1
+            while index<sim.params.k:
+                if len(sim.states.queue[index])<len(sim.states.queue[shortestQueue]):
+                    shortestQueue = index
+
+                index+=1
+            
+            sim.states.queue[shortestQueue].append(sim.simclock)
         else:
             delay = 0.0
             sim.states.totalDelay += delay
@@ -189,16 +206,16 @@ class DepartureEvent(Event):
 
 
     def process(self, sim):
-        #if there is no one in the queue, make the server idle
-        if sim.states.numInQ==0:
-            sim.states.initStatus(sim.params.k)
+        #if there is no one in the particular queue from which the departure event is being issued, make the server idle
+        if len(sim.states.queue[self.serverNo])==0:
+            sim.states.status[self.serverNo] = IDLE
         else:
-            #queue is nonempty, so let the first person in queue receive service
+            #queue of this particular server is nonempty, so let the first person in queue receive service
             sim.states.numInQ -= 1
 
             #the we get the arrival time of the first person
             #in the queue(sim.states.queue) and calculate the delay faced
-            delay = sim.simclock - sim.states.queue[0]
+            delay = sim.simclock - sim.states.queue[self.serverNo][0]
             sim.states.totalDelay += delay
 
             #increment the number of customers served and schedule departure
@@ -209,7 +226,7 @@ class DepartureEvent(Event):
             sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
 
             #move everyone in the queue one step up
-            sim.states.queue = sim.states.queue[1:]
+            sim.states.queue[self.serverNo] = sim.states.queue[self.serverNo][1:]
 
 
 
@@ -226,6 +243,7 @@ class Simulator:
     def initialize(self):
         self.simclock = 0
         self.states.initStatus(self.params.k)
+        self.states.initQueue(self.params.k)
         self.scheduleEvent(StartEvent(0, self))
 
     def configure(self, params, states):
@@ -380,10 +398,10 @@ def experiment3():
 def main():
     print("Experiment 1")
     experiment1()
-    print("\n\nExperiment 2")
-    experiment2()
-    print("\n\nExperiment 3")
-    experiment3()
+    # print("\n\nExperiment 2")
+    # experiment2()
+    # print("\n\nExperiment 3")
+    # experiment3()
 
 
 if __name__ == "__main__":
