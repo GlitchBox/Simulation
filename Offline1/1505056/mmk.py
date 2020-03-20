@@ -295,7 +295,7 @@ class Simulator:
 def experiment1():
     seed = 101
     sim = Simulator(seed)
-    sim.configure(Params(5.0 / 60, 8.0 / 60, 1), States())
+    sim.configure(Params(5.0 / 60, 8.0 / 60, 2), States())
     sim.run()
     sim.printResults()    
         
