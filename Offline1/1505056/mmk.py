@@ -73,7 +73,7 @@ class States:
 
     def finish(self, sim):
         self.avgQdelay = self.totalDelay/self.served
-        self.avgQlength = (self.areaNumInQ/sim.simclock)/sim.params.k
+        self.avgQlength = (self.areaNumInQ/sim.simclock)/sim.params.queueNo
         self.util = self.areaServerStatus/sim.simclock
 
     def printResults(self, sim):
@@ -256,7 +256,8 @@ class DepartureEvent(Event):
 
 
             else:
-                sim.states.initStatus(sim.params.k)
+                #sim.states.initStatus(sim.params.k)
+                sim.states.status[self.serverNo] = IDLE
 
 
         else:
@@ -348,6 +349,7 @@ class Simulator:
 
         while len(self.eventQ) > 0:
             time, event = heapq.heappop(self.eventQ)
+            # print(self.states.queue)
             # print(event.eventTime, 'Event', event)
             # print(self.states.status)
 
@@ -479,14 +481,60 @@ def experiment3():
 
     plt.show()
 
+def experiment4():
+    # Similar to experiment2 but for different values of k; 1, 2, 3, 4
+    # Generate the same plots
+    # Fix lambd = (5.0/60), mu = (8.0/60) and change value of k
+    #here we have the same number of queues as the number of servers
+
+    #seed = 110
+    seed = 101
+    avglength = []
+    avgdelay = []
+    util = []
+    ks = [1,2,3,4]
+
+    for k in ks:
+        print(f"iteration {k}")
+        zrng[1] = 1973272912
+        sim = Simulator(seed)
+        sim.configure(Params(5.0/60, 8.0/60, k, k), States())
+        sim.run()
+        sim.printResults()
+
+        length, delay, utl = sim.getResults()
+        avglength.append(length)
+        avgdelay.append(delay)
+        util.append(utl)
+
+    plt.figure(1)
+    plt.subplot(311)
+    plt.plot(ks, avglength)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Avg Q length')
+
+    plt.subplot(312)
+    plt.plot(ks, avgdelay)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Avg Q delay (sec)')
+
+    plt.subplot(313)
+    plt.plot(ks, util)
+    plt.xlabel('Ratio (ro)')
+    plt.ylabel('Util')
+
+    plt.show()
+
 
 def main():
-    print("Experiment 1")
-    experiment1()
-    print("\n\nExperiment 2")
-    experiment2()
-    print("\n\nExperiment 3")
-    experiment3()
+    # print("Experiment 1")
+    # experiment1()
+    # print("\n\nExperiment 2")
+    # experiment2()
+     print("\n\nExperiment 3")
+     experiment3()
+    #print("\n\nExperiment 4")
+    #experiment4()
 
 
 if __name__ == "__main__":
