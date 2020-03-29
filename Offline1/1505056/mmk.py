@@ -168,7 +168,7 @@ class ArrivalEvent(Event):
         nextArrival = sim.simclock + temp
         sim.scheduleEvent(ArrivalEvent(nextArrival, sim))
 
-        #check to see if the server is busy
+        #check to see if any server is idle
         freeServer = sim.states.checkStatus(self.sim.params.k)
         if freeServer == -1:
             sim.states.numInQ += 1
@@ -182,7 +182,7 @@ class ArrivalEvent(Event):
                 index+=1
             # print(shortestQueue)
             # print(sim.states.queue)
-            sim.states.queue[shortestQueue].append(sim.simclock)
+            sim.states.queue[shortestQueue].append(sim.simclock) #this is the arrival time
             # print(sim.states.queue)
             # print("here")
         else:
@@ -211,18 +211,18 @@ class DepartureEvent(Event):
 
     def process(self, sim):
         #if there is no one in the particular queue from which the departure event is being issued, make the server idle
-        if (len(sim.states.queue)==1 and len(sim.states.queue[0])==0) or (len(sim.states.queue)>1 and len(sim.states.queue[self.serverNo])==0):
+        # if (len(sim.states.queue)==1 and len(sim.states.queue[0])==0) or (len(sim.states.queue)>1 and len(sim.states.queue[self.serverNo])==0):
 
             #considerations for the case 1) the server can be at the leftmost position 2) at the rightmost position 3) other positions
-            largerQ = -1
-            maxDiff = -1
-            if len(sim.states.queue)>1:
-                if self.serverNo==0:
+        largerQ = -1
+        maxDiff = -1
+        if len(sim.states.queue)>1 and len(sim.states.queue[self.serverNo])==0:
+                if self.serverNo==0: #leftmost server
                     largerQ = self.serverNo+1
-                    maxDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
-                elif self.serverNo==(sim.params.k-1):
+                    maxDiff = len(sim.states.queue[largerQ]) - len(sim.states.queue[self.serverNo])
+                elif self.serverNo==(sim.params.k-1): #rightmost server
                     largerQ = self.serverNo-1
-                    maxDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
+                    maxDiff = len(sim.states.queue[largerQ]) - len(sim.states.queue[self.serverNo])
                 else:
                     leftDiff = len(sim.states.queue[self.serverNo-1])- len(sim.states.queue[self.serverNo])
                     rightDiff = len(sim.states.queue[self.serverNo+1])- len(sim.states.queue[self.serverNo])
@@ -234,28 +234,28 @@ class DepartureEvent(Event):
                         maxDiff = leftDiff
                         largerQ = self.serverNo - 1
 
-                    if maxDiff>=2:
-                        sim.states.numInQ -= 1
+                if maxDiff>=2:
+                    sim.states.numInQ -= 1
 
-                        #the we get the arrival time of the first person
-                        #in the queue(sim.states.queue) and calculate the delay faced
-                        delay = sim.simclock - sim.states.queue[largerQ][-1]
-                        sim.states.totalDelay += delay
+                    #the we get the arrival time of the first person
+                    #in the queue(sim.states.queue) and calculate the delay faced
+                    delay = sim.simclock - sim.states.queue[largerQ][-1]
+                    sim.states.totalDelay += delay
 
-                        #increment the number of customers served and schedule departure
-                        sim.states.served += 1
-                        temp= sim.expon(1/sim.params.mu)
-                        # print(temp)
-                        departureTime = sim.simclock + temp
-                        sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
+                    #increment the number of customers served and schedule departure
+                    sim.states.served += 1
+                    temp= sim.expon(1/sim.params.mu)
+                    # print(temp)
+                    departureTime = sim.simclock + temp
+                    sim.scheduleEvent(DepartureEvent(departureTime, sim, self.serverNo))
 
-                        #the last person from the largerQ has left
-                        sim.states.queue[largerQ] = sim.states.queue[largerQ][0:-1]
-                    else:
-                        sim.states.status[self.serverNo] = IDLE
+                    #the last person from the largerQ has left
+                    sim.states.queue[largerQ] = sim.states.queue[largerQ][0:-1]
+                else:
+                    sim.states.status[self.serverNo] = IDLE
 
 
-            else:
+        elif len(sim.states.queue)==1 and len(sim.states.queue[self.serverNo])==0:
                 #sim.states.initStatus(sim.params.k)
                 sim.states.status[self.serverNo] = IDLE
 
@@ -292,10 +292,10 @@ class DepartureEvent(Event):
                 maxDiff = -1
                 if self.serverNo==0:
                     largerQ = self.serverNo + 1
-                    maxDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
+                    maxDiff = len(sim.states.queue[largerQ]) - len(sim.states.queue[self.serverNo])
                 elif self.serverNo==(sim.params.k-1):
                     largerQ = self.serverNo - 1
-                    maxDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
+                    maxDiff = len(sim.states.queue[largerQ]) - len(sim.states.queue[self.serverNo])
                 else:
                     rightDiff = len(sim.states.queue[self.serverNo+1]) - len(sim.states.queue[self.serverNo])
                     leftDiff = len(sim.states.queue[self.serverNo-1]) - len(sim.states.queue[self.serverNo])
@@ -349,9 +349,14 @@ class Simulator:
 
         while len(self.eventQ) > 0:
             time, event = heapq.heappop(self.eventQ)
-            # print(self.states.queue)
-            # print(event.eventTime, 'Event', event)
+            
+            # print('Queue:')
+            # print(len(self.states.queue[0]), len(self.states.queue[1]))
+            # print('Server Status:')
             # print(self.states.status)
+            # print(event.eventTime, 'Event', event)
+            # if event.eventType == 'DEPART':
+            #     print(f"Server No: {event.serverNo}")
 
             if event.eventType == 'EXIT':
                 # event.process(self)
@@ -364,7 +369,11 @@ class Simulator:
             # print(event.eventTime, 'Event', event)
             self.simclock = event.eventTime
             event.process(self)
+            # print('Queue after event: ')
+            # print(len(self.states.queue[0]), len(self.states.queue[1]))
+            # print('Server status after event:')
             # print(self.states.status)
+            # print('\n\n\n')
 
         self.states.finish(self)
 
@@ -493,6 +502,7 @@ def experiment4():
     avgdelay = []
     util = []
     ks = [1,2,3,4]
+    # ks = [4]
 
     for k in ks:
         print(f"iteration {k}")
@@ -531,10 +541,10 @@ def main():
     # experiment1()
     # print("\n\nExperiment 2")
     # experiment2()
-     print("\n\nExperiment 3")
-     experiment3()
-    #print("\n\nExperiment 4")
-    #experiment4()
+    # print("\n\nExperiment 3")
+    # experiment3()
+    print("\n\nExperiment 4")
+    experiment4()
 
 
 if __name__ == "__main__":
