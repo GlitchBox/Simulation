@@ -382,17 +382,17 @@ def experiment4():
     plt.figure(1)
     plt.subplot(311)
     plt.plot(ks, avglength)
-    plt.xlabel('Ratio (ro)')
+    plt.xlabel('K')
     plt.ylabel('Avg Q length')
 
     plt.subplot(312)
     plt.plot(ks, avgdelay)
-    plt.xlabel('Ratio (ro)')
+    plt.xlabel('K')
     plt.ylabel('Avg Q delay (sec)')
 
     plt.subplot(313)
     plt.plot(ks, util)
-    plt.xlabel('Ratio (ro)')
+    plt.xlabel('K')
     plt.ylabel('Util')
 
     plt.show()
